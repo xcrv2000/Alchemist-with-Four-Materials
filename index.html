@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>四素材的炼药师</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- 左侧：药材列表 -->
+        <div class="column left-column">
+            <h2>药材库</h2>
+            <div id="ingredient-list">
+                <!-- 药材项将由JS动态生成 -->
+            </div>
+        </div>
+
+        <!-- 中间：炼药锅 -->
+        <div class="column cauldron-column">
+            <h2>炼药锅</h2>
+            <div class="cauldron-area">
+                <div class="cauldron-visual">
+                    <!-- 简单的炼药锅视觉表现 -->
+                    <div class="cauldron-pot"></div>
+                </div>
+                <button id="brew-btn">开始炼药</button>
+                <div id="message-area"></div>
+            </div>
+        </div>
+
+        <!-- 右侧：历史记录 -->
+        <div class="column right-column" id="history-column">
+            <!-- 移动端折叠状态显示 -->
+            <div class="mobile-history-collapsed">
+                <div class="history-label">炼药记录</div>
+                <div id="history-preview"></div>
+            </div>
+
+            <!-- 完整内容 -->
+            <div class="history-full-content">
+                <div class="title-bar">
+                    <h2>炼药记录</h2>
+                    <div class="header-actions">
+                        <button id="pokedex-btn">图鉴</button>
+                        <button id="close-history-btn" class="mobile-only">&times;</button>
+                    </div>
+                </div>
+                <div class="search-bar">
+                    <input type="text" id="history-search" placeholder="搜索材料或结果...">
+                </div>
+                <div id="history-list">
+                    <!-- 历史记录卡片将由JS动态生成 -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 图鉴悬浮窗 -->
+    <div id="pokedex-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>药剂图鉴 <span id="pokedex-progress">(0/110)</span></h2>
+                <div class="modal-actions">
+                    <button id="clear-pokedex-btn">清空记录</button>
+                    <span id="close-pokedex-btn" class="close-modal">&times;</span>
+                </div>
+            </div>
+            <div id="pokedex-grid" class="pokedex-grid">
+                <!-- 图鉴卡片由JS生成 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 调试面板 (仅当 ADMIN = true 时显示) -->
+    <div id="debug-panel" class="hidden">
+        <h3>调试面板</h3>
+        <p>相图: <span id="debug-phase-name">-</span></p>
+        <p>坐标: (<span id="debug-x">0</span>, <span id="debug-y">0</span>)</p>
+        <p>颜色: <span id="debug-color">-</span></p>
+        <div style="position: relative; margin-top: 10px; padding-left: 20px; padding-bottom: 20px;">
+            <div id="debug-y-label" style="position: absolute; left: 0; top: 40%; font-size: 12px; font-weight: bold;">Y</div>
+            <div id="debug-canvas-container"></div>
+            <div id="debug-x-label" style="position: absolute; bottom: 0; left: 50%; font-size: 12px; font-weight: bold;">X</div>
+        </div>
+    </div>
+
+    <script>
+        // 硬编码的 ADMIN 标志，发布前请手动改为 false
+        const ADMIN = false;
+    </script>
+    <script src="script.js"></script>
+</body>
+</html>
