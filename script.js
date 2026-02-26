@@ -1,4 +1,4 @@
-﻿﻿
+﻿﻿﻿﻿﻿﻿
 // 全局常量：是否为管理员模式（调试用）
 // const ADMIN = true; // 此行在HTML中定义
 
@@ -578,6 +578,7 @@ function brewPotion() {
         showMessage(`炼制成功：${potion.name}`, false, potion.desc);
         addToHistory(potion.name, potion.desc, false, ingredientsText);
         unlockPotion(potionKey);
+        saveRecipe(potionKey, ingredientsText);
     } else {
         showMessage('未知药剂 (查无此配方)', true);
         addToHistory('失败？', '不存在的效果', true, ingredientsText);
@@ -774,6 +775,7 @@ function updateDebugPanel(name, x, y, color, xAttr, yAttr) {
 // --- Pokedex Logic ---
 
 let unlockedPotions = new Set();
+let potionRecipes = {}; // Store recipes: { potionKey: ["recipe1", "recipe2"] }
 const TOTAL_POTIONS = 110;
 
 // 初始化图鉴
@@ -782,6 +784,12 @@ function initPokedex() {
     if (saved) {
         unlockedPotions = new Set(JSON.parse(saved));
     }
+    
+    const savedRecipes = localStorage.getItem('potionRecipes');
+    if (savedRecipes) {
+        potionRecipes = JSON.parse(savedRecipes);
+    }
+
     updatePokedexProgress();
 
     // 绑定事件
@@ -793,6 +801,13 @@ function initPokedex() {
     
     const clearBtn = document.getElementById('clear-pokedex-btn');
     if (clearBtn) clearBtn.addEventListener('click', clearPokedex);
+
+    // Search and Filter events
+    const searchInput = document.getElementById('pokedex-search');
+    if (searchInput) searchInput.addEventListener('input', () => renderPokedex());
+    
+    // 初始化药材数量筛选器
+    initPokedexFilters();
     
     // 点击模态框外部关闭
     window.addEventListener('click', (event) => {
@@ -801,6 +816,45 @@ function initPokedex() {
             closePokedex();
         }
     });
+}
+
+// 初始化图鉴筛选器
+function initPokedexFilters() {
+    const container = document.getElementById('pokedex-filter-container');
+    if (!container) return;
+    
+    container.innerHTML = '<span class="filter-label">配方筛选:</span>';
+    
+    Object.keys(INGREDIENTS).forEach(name => {
+        const data = INGREDIENTS[name];
+        const wrapper = document.createElement('div');
+        wrapper.className = 'pokedex-filter-item';
+        
+        wrapper.innerHTML = `
+            <div class="pokedex-filter-icon">${data.icon}</div>
+            <input type="number" min="0" class="pokedex-filter-input" data-name="${name}" placeholder="-">
+        `;
+        
+        container.appendChild(wrapper);
+    });
+    
+    // 绑定输入事件
+    const inputs = container.querySelectorAll('.pokedex-filter-input');
+    inputs.forEach(input => {
+        input.addEventListener('input', () => renderPokedex());
+    });
+}
+
+// Save recipe
+function saveRecipe(potionKey, ingredientsText) {
+    if (!potionRecipes[potionKey]) {
+        potionRecipes[potionKey] = [];
+    }
+    // Check for duplicates
+    if (!potionRecipes[potionKey].includes(ingredientsText)) {
+        potionRecipes[potionKey].push(ingredientsText);
+        localStorage.setItem('potionRecipes', JSON.stringify(potionRecipes));
+    }
 }
 
 // 解锁药剂
@@ -823,8 +877,27 @@ function updatePokedexProgress() {
 // 打开图鉴
 function openPokedex() {
     const modal = document.getElementById('pokedex-modal');
+    modal.classList.remove('hidden');
+    renderPokedex();
+}
+
+// 渲染图鉴 (支持搜索和筛选)
+function renderPokedex() {
     const grid = document.getElementById('pokedex-grid');
-    grid.innerHTML = ''; // 清空现有内容
+    grid.innerHTML = ''; 
+
+    const searchTerm = document.getElementById('pokedex-search').value.toLowerCase();
+    
+    // 获取筛选条件
+    const filterInputs = document.querySelectorAll('.pokedex-filter-input');
+    const filters = {};
+    let hasFilter = false;
+    filterInputs.forEach(input => {
+        if (input.value !== '') {
+            filters[input.dataset.name] = parseFloat(input.value);
+            hasFilter = true;
+        }
+    });
 
     // 遍历所有药剂
     // POTION_DB 的键是无序的，我们最好按顺序显示
@@ -854,21 +927,74 @@ function openPokedex() {
         const potion = POTION_DB[key];
         const isUnlocked = unlockedPotions.has(key);
         
+        // 1. Name Search
+        const name = isUnlocked ? potion.name : '???';
+        if (searchTerm && !name.toLowerCase().includes(searchTerm)) {
+            return;
+        }
+
+        // 2. Ingredient Quantity Filter
+        if (hasFilter) {
+            if (!isUnlocked) return; // Locked potions don't have recipes
+            
+            const recipes = potionRecipes[key] || [];
+            if (recipes.length === 0) return;
+
+            // 检查是否有任一配方满足筛选条件
+            const matchingRecipe = recipes.some(recipeStr => {
+                // 解析配方字符串 "盔瓣蛛兰 x4, 水冬藻 x3" -> { '盔瓣蛛兰': 4, '水冬藻': 3 }
+                const currentRecipeCounts = {};
+                const parts = recipeStr.split(', ');
+                parts.forEach(part => {
+                    // split by ' x' from the end
+                    const lastIndex = part.lastIndexOf(' x');
+                    if (lastIndex !== -1) {
+                        const name = part.substring(0, lastIndex);
+                        const count = parseFloat(part.substring(lastIndex + 2));
+                        currentRecipeCounts[name] = count;
+                    }
+                });
+
+                // 检查是否满足所有筛选条件
+                return Object.entries(filters).every(([filterName, filterCount]) => {
+                    const recipeCount = currentRecipeCounts[filterName] || 0;
+                    // 使用浮点数比较，允许微小误差 (虽然这里一般是整数或0.5)
+                    return Math.abs(recipeCount - filterCount) < 0.01;
+                });
+            });
+            
+            if (!matchingRecipe) return;
+        }
+        
         const card = document.createElement('div');
         card.className = `pokedex-card ${isUnlocked ? 'unlocked' : 'locked'}`;
         
-        const name = isUnlocked ? potion.name : '???';
         const desc = isUnlocked ? potion.desc : '';
+        
+        let recipesHtml = '';
+        if (isUnlocked && potionRecipes[key] && potionRecipes[key].length > 0) {
+            recipesHtml = `
+                <div class="pokedex-recipes">
+                    <div class="recipe-title">已知配方:</div>
+                    <ul class="recipe-list">
+                        ${potionRecipes[key].map(r => `<li class="recipe-item">${r}</li>`).join('')}
+                    </ul>
+                </div>
+            `;
+            
+            card.addEventListener('click', () => {
+                card.classList.toggle('expanded');
+            });
+        }
         
         card.innerHTML = `
             <div class="pokedex-card-title">${name}</div>
             <div class="pokedex-card-desc">${desc}</div>
+            ${recipesHtml}
         `;
         
         grid.appendChild(card);
     });
-
-    modal.classList.remove('hidden');
 }
 
 // 关闭图鉴
@@ -880,9 +1006,11 @@ function closePokedex() {
 function clearPokedex() {
     if (confirm('确定要清空图鉴记录吗？此操作无法撤销。')) {
         unlockedPotions.clear();
+        potionRecipes = {};
         localStorage.removeItem('unlockedPotions');
+        localStorage.removeItem('potionRecipes');
         updatePokedexProgress();
-        openPokedex(); // 刷新显示
+        renderPokedex(); // 刷新显示
     }
 }
 
