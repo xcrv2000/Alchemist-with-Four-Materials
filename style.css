@@ -611,6 +611,8 @@ h2 {
     border-radius: 6px;
     padding: 10px;
     display: none; /* Hidden by default */
+    max-height: 150px;
+    overflow-y: auto;
 }
 
 .pokedex-card.expanded .pokedex-recipes {
